@@ -129,16 +129,17 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_role_policy" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
+#Create the nginx service wrapper and vars for nginx
 resource "aws_ecs_service" "nginx_service" {
   name            = "${var.environment}-${var.service}"
   cluster         = aws_ecs_cluster.nginx_cluster.id
   task_definition = aws_ecs_task_definition.nginx_task.arn
   launch_type     = "FARGATE"
-#this is not required, but maybe to consider with HA for reliability and help prevent restart downtime while ALB re-sets Set to 2 for 1 in each AZ. HA using LB is not perfect and will still experience upto 60 seconds of 404 if an nginx fails.
+# maybe to consider with HA for reliability and help prevent restart downtime while ALB re-sets Set to 2 for 1 in each AZ. HA using LB is not perfect and will still experience upto 60 seconds of 404 if an nginx fails.
 # Added as a variable to demonstrate possible configurations which could vary and more easyily changed or defined as a variable
   desired_count = ${var.desired_num_nginx} 
 
-# Wrong app netowrk and should be in the ALB public subnet
+# Wrong app network and should be in the ALB public subnet
 # I actually left the , in this time because it is a list and makes the code block smaller and more readable I think. 
   network_configuration {
     subnets         = [aws_subnet.public_1.id, aws_subnet.public_2.id]
@@ -158,7 +159,7 @@ resource "aws_ecs_service" "nginx_service" {
 
 #new  task to create ECS application servers 
 #THis should be set to desired 2 for HA and LB across 2 AZ but left. LB HA is not perfect and will take upto 60s + to detect an app failure and re-route traffic 500 errors likely. How long does a new app take to spin up? size of jboss jvm etc?
-
+#Create the nginx service wrapper and vars for app instances
 resource "aws_ecs_service" "app_service" {
   name            = "${var.environment}-app"
   cluster         = aws_ecs_cluster.nginx_cluster.id
