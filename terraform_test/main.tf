@@ -42,12 +42,11 @@ resource "aws_ecs_task_definition" "nginx_task" {
   execution_role_arn = aws_iam_role.ecs_execution_role.arn
 
 # no comments inside JSON  
-# Don't think Comma should be at the end of the portmappings 
+# Don't think Comma should be at the end of the portmappings But inside jsonencode can be ok
 
   container_definitions = jsonencode([{
     name  = "nginx-container"
     image = "nginx:latest"
-
     portMappings = [{
       containerPort = 80
       hostPort      = 80
@@ -56,7 +55,7 @@ resource "aws_ecs_task_definition" "nginx_task" {
   }])
 }
 
-#No application layer ECS task or definition. 
+#There was no application layer ECS task or definition. 
 #set port to 8080 for app servers listener
 resource "aws_ecs_task_definition" "app_task" {
   family                   = "app-task"
@@ -88,7 +87,7 @@ resource "aws_ecs_task_definition" "app_task" {
 resource "aws_iam_role" "ecs_task_role" {
   name = "ecs-task-role"
 
-# More commas on lines?
+# More commas on lines, not needed even within JSON as this is jsonEncode
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
@@ -102,6 +101,8 @@ resource "aws_iam_role" "ecs_task_role" {
 }
 
 #re-visit depending on if nginx requires any inputs or variables to read. 
+#THe permissions give the APP container access to read the AWS SSM secrets manager, but in this example not required as using sops at runtime. 
+#Would be useful in some deeper integrations with AWS. 
 
 resource "aws_iam_role_policy_attachment" "ecs_task_role_ssm" {
   role       = aws_iam_role.ecs_task_role.name
@@ -463,6 +464,7 @@ resource "aws_db_instance" "rds" {
   #instance type is very small for a multiAZ public facing web app? 1cpu, 1gb ram, depends on profile of work requested, execution plans, uniqueness of queries or it RO or RW etc
   multi_az               = true
   name                   = "mydb"
+#This could be related to SSM or could use IAM integration,(also require re-visiting permissions policys for IAM, SSM already present) Currently SOPS makes this a more independant deployment, but runtime logging stdout might reveal passwords and needs to be stripped before Cloudwatch
   username               = local.vars_encryted.DBusername
   password               = local.vars_encryted.DBpassword
   skip_final_snapshot    = true
