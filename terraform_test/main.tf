@@ -4,7 +4,7 @@
 # Operator need to be careful that the origional unencrypted file is not checked into bitbucket like I have done here to allow you to see the format. 
 # Only operators with access to the AWS kms key will be able to extract and read this secrets.enc.yaml
 # Other probably better fit solutions are availiable. If you have Directory Service, aws_secretsmanager_secret_version. 
-
+# Subject for discussion would be tagging, this has not been added, ogging configuration should also be discussed to match buniness ways of working and costs, client requirements etc
 
 locals{
   vars_encryted = yamldecode(sops_decrypt_file(find_in_parent_folders("secrets.enc.yaml")))
