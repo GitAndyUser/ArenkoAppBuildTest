@@ -42,7 +42,7 @@ resource "aws_ecs_task_definition" "nginx_task" {
   execution_role_arn = aws_iam_role.ecs_execution_role.arn
 
 # no comments inside JSON  
-# Don't think Comma should be at the end of the portmappings But inside jsonencode can be ok
+# Commas can be at the end of the portmappings But inside jsonencode can be ok
 
   container_definitions = jsonencode([{
     name  = "nginx-container"
@@ -53,7 +53,28 @@ resource "aws_ecs_task_definition" "nginx_task" {
     }
     ]
   }])
+
+#Setup Log driver
+  logConfiguration = {
+    logDriver = "awslogs"
+    options = {
+      "awslogs-group"         = aws_cloudwatch_log_group.nginx.name
+      "awslogs-region"        = var.aws_region
+      "awslogs-stream-prefix" = "prod-ecs"
+    }
+  }
+
 }
+#Set up logging resources
+resource "aws_cloudwatch_log_group" "nginx" {
+  name              = "/ecs/${var.environment}-nginx"
+  retention_in_days = 14
+  tags = {
+    Name        = "/ecs/${var.environment}-nginx"
+    Environment = var.environment
+  }
+}
+
 
 #There was no application layer ECS task or definition. 
 #set port to 8080 for app servers listener
@@ -78,8 +99,26 @@ resource "aws_ecs_task_definition" "app_task" {
       }]
     }
   ])
+  #Setup Log driver
+  logConfiguration = {
+    logDriver = "awslogs"
+    options = {
+      "awslogs-group"         = aws_cloudwatch_log_group.application.name
+      "awslogs-region"        = var.aws_region
+      "awslogs-stream-prefix" = "${var.environment}-ecs"
+    }
+  }
 }
 
+#more logging for app
+resource "aws_cloudwatch_log_group" "application" {
+  name              = "/ecs/${var.environment}-application"
+  retention_in_days = 7
+  tags = {
+    Name        = "/ecs/${var.environment}-application"
+    Environment = var.environment
+  }
+}
 
 
 
@@ -305,6 +344,13 @@ resource "aws_security_group" "alb_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+#No SSL traffic has been allocated, was this deliberate, based on nature of data sensitivity
+    ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   egress {
     description     = "Allow ALB to reach NGINX ECS tasks"
@@ -381,8 +427,8 @@ resource "aws_security_group" "application_sgrp" {
 
   egress {
     description = "Allow outbound to DB"
-    from_port   = 3306
-    to_port     = 3306
+    from_port   = 5432
+    to_port     = 5432
     protocol    = "tcp"
     security_groups = [aws_security_group.database_sgrp.id]
   }
@@ -400,8 +446,9 @@ resource "aws_security_group" "database_sgrp" {
 
   ingress {
     description = "Allow traffic from application layer"
-    from_port   = 3306
-    to_port     = 3306
+#Postgress DB default is 5432 not 3306
+    from_port   = 5432
+    to_port     = 5432
     protocol    = "tcp"
     security_groups = [aws_security_group.application_sgrp.id]
   }
@@ -465,6 +512,8 @@ resource "aws_db_instance" "rds" {
   multi_az               = true
   name                   = "mydb"
 #This could be related to SSM or could use IAM integration,(also require re-visiting permissions policys for IAM, SSM already present) Currently SOPS makes this a more independant deployment, but runtime logging stdout might reveal passwords and needs to be stripped before Cloudwatch
+#username               = jsondecode(data.aws_secretsmanager_secret_version.db_creds.secret_string)["DBusername"]
+#password               = jsondecode(data.aws_secretsmanager_secret_version.db_creds.secret_string)["DBpassword"] 
   username               = local.vars_encryted.DBusername
   password               = local.vars_encryted.DBpassword
   skip_final_snapshot    = true

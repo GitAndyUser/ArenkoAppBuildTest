@@ -9,6 +9,10 @@ variable "service" {
   type        = string
 }
 
+variable "aws_region" {
+  description = "AWS region"
+  type        = string
+}
 variable "desired_num_nginx" {
   description = "the service name"
   type        = number
